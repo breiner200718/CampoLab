@@ -20,7 +20,7 @@ function DetalleProducto() {
             setError("");
 
             const respuesta = await fetch(
-                `http://127.0.0.1:8000/productos/${id}`
+                `https://campolab-production.up.railway.app/productos/${id}`
             );
 
             const datos = await respuesta.json();
@@ -135,7 +135,7 @@ function DetalleProducto() {
                         <div className="bg-gray-100 min-h-[350px] flex items-center justify-center">
                             {producto.imagen ? (
                                 <img
-                                    src={`http://127.0.0.1:8000/uploads/${producto.imagen}`}
+                                    src={`https://campolab-production.up.railway.app/uploads/${producto.imagen}`}
                                     alt={producto.nombre}
                                     className="w-full h-full object-cover"
                                 />

@@ -60,7 +60,7 @@ function RecoverPassword() {
             setCargando(true)
 
             const respuesta = await fetch(
-                'http://127.0.0.1:8000/auth/recuperar-password',
+                'https://campolab-production.up.railway.app/auth/recuperar-password',
                 {
                     method: 'POST',
                     headers: {

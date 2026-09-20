@@ -39,7 +39,7 @@ function ResetPassword() {
             setCargando(true);
 
             const respuesta = await fetch(
-                "http://127.0.0.1:8000/auth/restablecer-password",
+                "https://campolab-production.up.railway.app/auth/restablecer-password",
                 {
                     method: "POST",
                     headers: {

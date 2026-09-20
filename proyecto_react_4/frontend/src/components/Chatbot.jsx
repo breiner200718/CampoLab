@@ -45,7 +45,7 @@ function Chatbot() {
       const token = localStorage.getItem("token");
 
       const respuesta = await fetch(
-        "http://127.0.0.1:8000/chatbot/",
+        "https://campolab-production.up.railway.app/chatbot/",
         {
           method: "POST",
           headers: {

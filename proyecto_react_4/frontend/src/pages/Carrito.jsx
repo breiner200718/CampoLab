@@ -125,7 +125,7 @@ function Carrito() {
             }));
 
             const respuesta = await fetch(
-                "http://127.0.0.1:8000/ventas/",
+                "https://campolab-production.up.railway.app/ventas/",
                 {
                     method: "POST",
                     headers: {
@@ -261,7 +261,7 @@ function Carrito() {
 
                                             {producto.imagen ? (
                                                 <img
-                                                    src={`http://127.0.0.1:8000/uploads/${producto.imagen}`}
+                                                    src={`https://campolab-production.up.railway.app/uploads/${producto.imagen}`}
                                                     alt={producto.nombre}
                                                     className="w-full h-full object-cover"
                                                 />
