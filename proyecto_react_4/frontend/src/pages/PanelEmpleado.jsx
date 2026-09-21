@@ -480,6 +480,98 @@ function PanelEmpleado() {
   };
 
   // =========================
+  // EXPORTAR VENTAS A PDF
+  // =========================
+
+  const exportarVentasPDF = async () => {
+    try {
+      setError("");
+
+      const token = obtenerToken();
+
+      const respuesta = await fetch(
+        `${API_URL}/ventas/exportar/pdf`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!respuesta.ok) {
+        const mensajeError = await obtenerMensajeError(respuesta);
+        throw new Error(mensajeError);
+      }
+
+      const blob = await respuesta.blob();
+
+      const url = window.URL.createObjectURL(blob);
+
+      const enlace = document.createElement("a");
+
+      enlace.href = url;
+      enlace.download = "reporte_ventas_campolab.pdf";
+
+      document.body.appendChild(enlace);
+
+      enlace.click();
+
+      enlace.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      setError(error.message);
+    }
+  };
+
+  // =========================
+  // EXPORTAR REPORTE DIARIO A PDF
+  // =========================
+
+  const exportarReporteDiarioPDF = async () => {
+    try {
+      setError("");
+
+      const token = obtenerToken();
+
+      const respuesta = await fetch(
+        `${API_URL}/ventas/reporte-diario/pdf`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!respuesta.ok) {
+        const mensajeError = await obtenerMensajeError(respuesta);
+        throw new Error(mensajeError);
+      }
+
+      const blob = await respuesta.blob();
+
+      const url = window.URL.createObjectURL(blob);
+
+      const enlace = document.createElement("a");
+
+      enlace.href = url;
+      enlace.download = "reporte_diario_campolab.pdf";
+
+      document.body.appendChild(enlace);
+
+      enlace.click();
+
+      enlace.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      setError(error.message);
+    }
+  };
+
+  // =========================
   // CARGAR DATOS
   // =========================
 
@@ -2035,6 +2127,20 @@ function PanelEmpleado() {
                     className="px-5 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition"
                   >
                     📊 Exportar Excel
+                  </button>
+
+                  <button
+                    onClick={exportarVentasPDF}
+                    className="px-5 py-3 rounded-xl bg-red-600 text-white hover:bg-red-700 transition"
+                  >
+                    📄 Exportar PDF
+                  </button>
+
+                  <button
+                    onClick={exportarReporteDiarioPDF}
+                    className="px-5 py-3 rounded-xl bg-purple-600 text-white hover:bg-purple-700 transition"
+                  >
+                    📅 PDF Diario
                   </button>
 
                 </div>

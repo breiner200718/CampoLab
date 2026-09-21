@@ -129,7 +129,6 @@ def registrar_venta(
     )
 
     db.add(nueva_venta)
-
     db.flush()
 
     # --------------------------------------------------------
@@ -180,10 +179,7 @@ def registrar_venta(
         subtotal=float(nueva_venta.subtotal),
         total=float(nueva_venta.total),
         estado=nueva_venta.estado,
-
-        # FECHA DE CREACIÓN
         fecha_creacion=nueva_venta.fecha_creacion,
-
         detalles=[
             {
                 "id_detalle": detalle.id_detalle,
@@ -216,30 +212,22 @@ def listar_ventas(
 
     consulta = db.query(Venta)
 
-    # --------------------------------------------------------
-    # SEGURIDAD POR ROL
-    # --------------------------------------------------------
-
+    # Cliente: solamente sus ventas
     if usuario_actual.id_rol == 3:
 
-        # El cliente solamente puede ver sus propias ventas
         consulta = consulta.filter(
             Venta.id_cliente == usuario_actual.id_usuario
         )
 
     else:
 
-        # Administrador y empleado pueden filtrar por cliente
         if id_cliente is not None:
 
             consulta = consulta.filter(
                 Venta.id_cliente == id_cliente
             )
 
-    # --------------------------------------------------------
-    # FILTRO POR NÚMERO DE FACTURA
-    # --------------------------------------------------------
-
+    # Filtro por factura
     if numero_factura is not None:
 
         consulta = consulta.filter(
@@ -248,10 +236,6 @@ def listar_ventas(
             )
         )
 
-    # --------------------------------------------------------
-    # Ordenar de más reciente a más antigua
-    # --------------------------------------------------------
-
     ventas = (
         consulta
         .order_by(Venta.id_venta.desc())
@@ -259,10 +243,6 @@ def listar_ventas(
     )
 
     resultado = []
-
-    # --------------------------------------------------------
-    # Construir respuesta
-    # --------------------------------------------------------
 
     for venta in ventas:
 
@@ -279,10 +259,7 @@ def listar_ventas(
                 subtotal=float(venta.subtotal),
                 total=float(venta.total),
                 estado=venta.estado,
-
-                # FECHA DE CREACIÓN
                 fecha_creacion=venta.fecha_creacion,
-
                 detalles=[
                     {
                         "id_detalle": detalle.id_detalle,
@@ -313,6 +290,13 @@ def reporte_diario(
     db: Session = Depends(get_db),
     usuario_actual: Usuario = Depends(obtener_usuario_actual)
 ):
+
+    if usuario_actual.id_rol not in [1, 2]:
+
+        raise HTTPException(
+            status_code=403,
+            detail="No tienes permiso para consultar el reporte diario"
+        )
 
     fecha_actual = date.today()
 
@@ -351,6 +335,13 @@ def resumen_ventas(
     usuario_actual: Usuario = Depends(obtener_usuario_actual)
 ):
 
+    if usuario_actual.id_rol not in [1, 2]:
+
+        raise HTTPException(
+            status_code=403,
+            detail="No tienes permiso para consultar el resumen de ventas"
+        )
+
     consulta = (
         db.query(
             func.date(Venta.fecha_creacion).label("fecha"),
@@ -362,29 +353,17 @@ def resumen_ventas(
         )
     )
 
-    # --------------------------------------------------------
-    # FILTRO POR FECHA INICIAL
-    # --------------------------------------------------------
-
     if fecha_inicio:
 
         consulta = consulta.filter(
             func.date(Venta.fecha_creacion) >= fecha_inicio
         )
 
-    # --------------------------------------------------------
-    # FILTRO POR FECHA FINAL
-    # --------------------------------------------------------
-
     if fecha_fin:
 
         consulta = consulta.filter(
             func.date(Venta.fecha_creacion) <= fecha_fin
         )
-
-    # --------------------------------------------------------
-    # AGRUPAR Y ORDENAR
-    # --------------------------------------------------------
 
     ventas = (
         consulta
@@ -396,10 +375,6 @@ def resumen_ventas(
         )
         .all()
     )
-
-    # --------------------------------------------------------
-    # RESPUESTA
-    # --------------------------------------------------------
 
     return {
         "ventas": [
@@ -426,6 +401,13 @@ def exportar_ventas_excel(
     db: Session = Depends(get_db),
     usuario_actual: Usuario = Depends(obtener_usuario_actual)
 ):
+
+    if usuario_actual.id_rol not in [1, 2]:
+
+        raise HTTPException(
+            status_code=403,
+            detail="No tienes permiso para exportar las ventas"
+        )
 
     ventas = (
         db.query(Venta)
@@ -474,6 +456,7 @@ def exportar_ventas_excel(
     }
 
     for columna, ancho in anchos.items():
+
         hoja.column_dimensions[columna].width = ancho
 
     archivo = BytesIO()
@@ -496,7 +479,516 @@ def exportar_ventas_excel(
 
 
 # ============================================================
-# GENERAR FACTURA PDF
+# EXPORTAR TODAS LAS VENTAS A PDF
+# ============================================================
+
+@router.get("/exportar/pdf")
+def exportar_ventas_pdf(
+    db: Session = Depends(get_db),
+    usuario_actual: Usuario = Depends(obtener_usuario_actual)
+):
+
+    if usuario_actual.id_rol not in [1, 2]:
+
+        raise HTTPException(
+            status_code=403,
+            detail="No tienes permiso para exportar las ventas"
+        )
+
+    ventas = (
+        db.query(Venta)
+        .order_by(Venta.id_venta.desc())
+        .all()
+    )
+
+    archivo = BytesIO()
+
+    pdf = canvas.Canvas(
+        archivo,
+        pagesize=letter
+    )
+
+    ancho, alto = letter
+
+    # --------------------------------------------------------
+    # Encabezado
+    # --------------------------------------------------------
+
+    pdf.setFont("Helvetica-Bold", 20)
+
+    pdf.drawString(
+        50,
+        alto - 50,
+        "CAMPOLAB"
+    )
+
+    pdf.setFont("Helvetica-Bold", 14)
+
+    pdf.drawString(
+        50,
+        alto - 75,
+        "REPORTE GENERAL DE VENTAS"
+    )
+
+    pdf.setFont("Helvetica", 9)
+
+    pdf.drawString(
+        50,
+        alto - 95,
+        f"Fecha de generación: {date.today()}"
+    )
+
+    # --------------------------------------------------------
+    # Encabezados de tabla
+    # --------------------------------------------------------
+
+    posicion_y = alto - 130
+
+    pdf.setFont(
+        "Helvetica-Bold",
+        8
+    )
+
+    pdf.drawString(40, posicion_y, "Factura")
+    pdf.drawString(130, posicion_y, "Cliente")
+    pdf.drawString(210, posicion_y, "Fecha")
+    pdf.drawString(300, posicion_y, "Subtotal")
+    pdf.drawString(395, posicion_y, "Total")
+    pdf.drawString(475, posicion_y, "Estado")
+
+    posicion_y -= 18
+
+    pdf.setFont(
+        "Helvetica",
+        8
+    )
+
+    total_general = 0
+    cantidad_ventas = 0
+
+    # --------------------------------------------------------
+    # Ventas
+    # --------------------------------------------------------
+
+    for venta in ventas:
+
+        cliente = db.query(Usuario).filter(
+            Usuario.id_usuario == venta.id_cliente
+        ).first()
+
+        if cliente:
+
+            nombre_cliente = (
+                f"{cliente.nombre} {cliente.apellido}"
+            )
+
+        else:
+
+            nombre_cliente = "Sin cliente"
+
+        if len(nombre_cliente) > 18:
+            nombre_cliente = nombre_cliente[:18] + "..."
+
+        factura = venta.numero_factura or "Sin factura"
+
+        fecha_venta = (
+            venta.fecha_creacion.strftime("%Y-%m-%d")
+            if venta.fecha_creacion
+            else "N/A"
+        )
+
+        subtotal = float(
+            venta.subtotal or 0
+        )
+
+        total = float(
+            venta.total or 0
+        )
+
+        estado = (
+            "Activa"
+            if venta.estado
+            else "Inactiva"
+        )
+
+        pdf.drawString(
+            40,
+            posicion_y,
+            factura
+        )
+
+        pdf.drawString(
+            130,
+            posicion_y,
+            nombre_cliente
+        )
+
+        pdf.drawString(
+            210,
+            posicion_y,
+            fecha_venta
+        )
+
+        pdf.drawString(
+            300,
+            posicion_y,
+            f"${subtotal:,.2f}"
+        )
+
+        pdf.drawString(
+            395,
+            posicion_y,
+            f"${total:,.2f}"
+        )
+
+        pdf.drawString(
+            475,
+            posicion_y,
+            estado
+        )
+
+        total_general += total
+        cantidad_ventas += 1
+
+        posicion_y -= 18
+
+        # ----------------------------------------------------
+        # Nueva página
+        # ----------------------------------------------------
+
+        if posicion_y < 80:
+
+            pdf.showPage()
+
+            pdf.setFont(
+                "Helvetica-Bold",
+                12
+            )
+
+            pdf.drawString(
+                40,
+                alto - 50,
+                "CAMPOLAB - REPORTE DE VENTAS"
+            )
+
+            posicion_y = alto - 80
+
+            pdf.setFont(
+                "Helvetica",
+                8
+            )
+
+    # --------------------------------------------------------
+    # Resumen
+    # --------------------------------------------------------
+
+    posicion_y -= 15
+
+    pdf.setFont(
+        "Helvetica-Bold",
+        10
+    )
+
+    pdf.drawString(
+        40,
+        posicion_y,
+        f"Cantidad total de ventas: {cantidad_ventas}"
+    )
+
+    posicion_y -= 20
+
+    pdf.drawString(
+        40,
+        posicion_y,
+        f"Total recaudado: ${total_general:,.2f}"
+    )
+
+    # --------------------------------------------------------
+    # Pie
+    # --------------------------------------------------------
+
+    posicion_y -= 40
+
+    pdf.setFont(
+        "Helvetica",
+        9
+    )
+
+    pdf.drawString(
+        40,
+        posicion_y,
+        "Reporte generado por el sistema CampoLab."
+    )
+
+    pdf.save()
+
+    archivo.seek(0)
+
+    return StreamingResponse(
+        archivo,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition":
+                "attachment; filename=reporte_ventas_campolab.pdf"
+        }
+    )
+
+
+# ============================================================
+# EXPORTAR REPORTE DIARIO A PDF
+# ============================================================
+
+@router.get("/reporte-diario/pdf")
+def exportar_reporte_diario_pdf(
+    db: Session = Depends(get_db),
+    usuario_actual: Usuario = Depends(obtener_usuario_actual)
+):
+
+    if usuario_actual.id_rol not in [1, 2]:
+
+        raise HTTPException(
+            status_code=403,
+            detail="No tienes permiso para exportar el reporte diario"
+        )
+
+    fecha_actual = date.today()
+
+    ventas = (
+        db.query(Venta)
+        .filter(
+            func.date(Venta.fecha_creacion) == fecha_actual,
+            Venta.estado == True
+        )
+        .order_by(Venta.id_venta.desc())
+        .all()
+    )
+
+    cantidad_ventas = len(ventas)
+
+    total_vendido = sum(
+        float(venta.total or 0)
+        for venta in ventas
+    )
+
+    archivo = BytesIO()
+
+    pdf = canvas.Canvas(
+        archivo,
+        pagesize=letter
+    )
+
+    ancho, alto = letter
+
+    # --------------------------------------------------------
+    # Encabezado
+    # --------------------------------------------------------
+
+    pdf.setFont(
+        "Helvetica-Bold",
+        20
+    )
+
+    pdf.drawString(
+        50,
+        alto - 50,
+        "CAMPOLAB"
+    )
+
+    pdf.setFont(
+        "Helvetica-Bold",
+        14
+    )
+
+    pdf.drawString(
+        50,
+        alto - 75,
+        "REPORTE DIARIO DE VENTAS"
+    )
+
+    pdf.setFont(
+        "Helvetica",
+        10
+    )
+
+    pdf.drawString(
+        50,
+        alto - 100,
+        f"Fecha: {fecha_actual}"
+    )
+
+    # --------------------------------------------------------
+    # Resumen
+    # --------------------------------------------------------
+
+    pdf.setFont(
+        "Helvetica-Bold",
+        11
+    )
+
+    pdf.drawString(
+        50,
+        alto - 135,
+        f"Cantidad de ventas: {cantidad_ventas}"
+    )
+
+    pdf.drawString(
+        50,
+        alto - 155,
+        f"Total vendido: ${total_vendido:,.2f}"
+    )
+
+    # --------------------------------------------------------
+    # Tabla
+    # --------------------------------------------------------
+
+    posicion_y = alto - 195
+
+    pdf.setFont(
+        "Helvetica-Bold",
+        9
+    )
+
+    pdf.drawString(
+        50,
+        posicion_y,
+        "Factura"
+    )
+
+    pdf.drawString(
+        180,
+        posicion_y,
+        "Cliente"
+    )
+
+    pdf.drawString(
+        330,
+        posicion_y,
+        "Hora"
+    )
+
+    pdf.drawString(
+        420,
+        posicion_y,
+        "Total"
+    )
+
+    posicion_y -= 20
+
+    pdf.setFont(
+        "Helvetica",
+        9
+    )
+
+    for venta in ventas:
+
+        cliente = db.query(Usuario).filter(
+            Usuario.id_usuario == venta.id_cliente
+        ).first()
+
+        if cliente:
+
+            nombre_cliente = (
+                f"{cliente.nombre} {cliente.apellido}"
+            )
+
+        else:
+
+            nombre_cliente = "Sin cliente"
+
+        if len(nombre_cliente) > 25:
+            nombre_cliente = nombre_cliente[:25] + "..."
+
+        hora = (
+            venta.fecha_creacion.strftime("%H:%M:%S")
+            if venta.fecha_creacion
+            else "N/A"
+        )
+
+        total = float(
+            venta.total or 0
+        )
+
+        pdf.drawString(
+            50,
+            posicion_y,
+            venta.numero_factura or "N/A"
+        )
+
+        pdf.drawString(
+            180,
+            posicion_y,
+            nombre_cliente
+        )
+
+        pdf.drawString(
+            330,
+            posicion_y,
+            hora
+        )
+
+        pdf.drawString(
+            420,
+            posicion_y,
+            f"${total:,.2f}"
+        )
+
+        posicion_y -= 20
+
+        if posicion_y < 80:
+
+            pdf.showPage()
+
+            pdf.setFont(
+                "Helvetica-Bold",
+                12
+            )
+
+            pdf.drawString(
+                50,
+                alto - 50,
+                "CAMPOLAB - REPORTE DIARIO"
+            )
+
+            posicion_y = alto - 80
+
+            pdf.setFont(
+                "Helvetica",
+                9
+            )
+
+    # --------------------------------------------------------
+    # Pie
+    # --------------------------------------------------------
+
+    posicion_y -= 20
+
+    pdf.setFont(
+        "Helvetica",
+        9
+    )
+
+    pdf.drawString(
+        50,
+        posicion_y,
+        "Reporte generado por el sistema CampoLab."
+    )
+
+    pdf.save()
+
+    archivo.seek(0)
+
+    return StreamingResponse(
+        archivo,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition":
+                f"attachment; filename=reporte_diario_{fecha_actual}.pdf"
+        }
+    )
+
+
+# ============================================================
+# GENERAR FACTURA PDF INDIVIDUAL
 # ============================================================
 
 @router.get("/{id_venta}/factura/pdf")
@@ -505,10 +997,6 @@ def generar_factura_pdf(
     db: Session = Depends(get_db),
     usuario_actual: Usuario = Depends(obtener_usuario_actual)
 ):
-
-    # --------------------------------------------------------
-    # Buscar la venta
-    # --------------------------------------------------------
 
     venta = db.query(Venta).filter(
         Venta.id_venta == id_venta
@@ -521,10 +1009,7 @@ def generar_factura_pdf(
             detail="La venta no existe"
         )
 
-    # --------------------------------------------------------
-    # SEGURIDAD POR ROL
-    # --------------------------------------------------------
-
+    # Cliente solamente puede ver su propia factura
     if (
         usuario_actual.id_rol == 3
         and venta.id_cliente != usuario_actual.id_usuario
@@ -535,25 +1020,13 @@ def generar_factura_pdf(
             detail="No tienes permiso para descargar esta factura"
         )
 
-    # --------------------------------------------------------
-    # Buscar cliente
-    # --------------------------------------------------------
-
     cliente = db.query(Usuario).filter(
         Usuario.id_usuario == venta.id_cliente
     ).first()
 
-    # --------------------------------------------------------
-    # Buscar detalles
-    # --------------------------------------------------------
-
     detalles = db.query(VentaDetalle).filter(
         VentaDetalle.id_venta == venta.id_venta
     ).all()
-
-    # --------------------------------------------------------
-    # Crear PDF en memoria
-    # --------------------------------------------------------
 
     archivo = BytesIO()
 
@@ -565,10 +1038,13 @@ def generar_factura_pdf(
     ancho, alto = letter
 
     # --------------------------------------------------------
-    # ENCABEZADO
+    # Encabezado
     # --------------------------------------------------------
 
-    pdf.setFont("Helvetica-Bold", 20)
+    pdf.setFont(
+        "Helvetica-Bold",
+        20
+    )
 
     pdf.drawString(
         50,
@@ -576,7 +1052,10 @@ def generar_factura_pdf(
         "CAMPOLAB"
     )
 
-    pdf.setFont("Helvetica-Bold", 14)
+    pdf.setFont(
+        "Helvetica-Bold",
+        14
+    )
 
     pdf.drawString(
         50,
@@ -585,10 +1064,13 @@ def generar_factura_pdf(
     )
 
     # --------------------------------------------------------
-    # INFORMACIÓN DE LA FACTURA
+    # Información
     # --------------------------------------------------------
 
-    pdf.setFont("Helvetica", 10)
+    pdf.setFont(
+        "Helvetica",
+        10
+    )
 
     pdf.drawString(
         50,
@@ -621,12 +1103,15 @@ def generar_factura_pdf(
         )
 
     # --------------------------------------------------------
-    # ENCABEZADOS DE PRODUCTOS
+    # Encabezados de productos
     # --------------------------------------------------------
 
     posicion_y = alto - 220
 
-    pdf.setFont("Helvetica-Bold", 10)
+    pdf.setFont(
+        "Helvetica-Bold",
+        10
+    )
 
     pdf.drawString(
         50,
@@ -652,13 +1137,16 @@ def generar_factura_pdf(
         "Subtotal"
     )
 
-    # --------------------------------------------------------
-    # PRODUCTOS
-    # --------------------------------------------------------
-
     posicion_y -= 25
 
-    pdf.setFont("Helvetica", 9)
+    pdf.setFont(
+        "Helvetica",
+        9
+    )
+
+    # --------------------------------------------------------
+    # Productos
+    # --------------------------------------------------------
 
     for detalle in detalles:
 
@@ -673,7 +1161,9 @@ def generar_factura_pdf(
         )
 
         if len(nombre_producto) > 35:
-            nombre_producto = nombre_producto[:35] + "..."
+            nombre_producto = (
+                nombre_producto[:35] + "..."
+            )
 
         pdf.drawString(
             50,
@@ -713,7 +1203,7 @@ def generar_factura_pdf(
             )
 
     # --------------------------------------------------------
-    # TOTALES
+    # Totales
     # --------------------------------------------------------
 
     posicion_y -= 20
@@ -755,7 +1245,7 @@ def generar_factura_pdf(
     )
 
     # --------------------------------------------------------
-    # PIE DE FACTURA
+    # Pie
     # --------------------------------------------------------
 
     posicion_y -= 50
@@ -771,17 +1261,9 @@ def generar_factura_pdf(
         "Gracias por comprar en CampoLab."
     )
 
-    # --------------------------------------------------------
-    # Finalizar PDF
-    # --------------------------------------------------------
-
     pdf.save()
 
     archivo.seek(0)
-
-    # --------------------------------------------------------
-    # Descargar PDF
-    # --------------------------------------------------------
 
     return StreamingResponse(
         archivo,
@@ -820,10 +1302,7 @@ def obtener_venta(
             detail="La venta no existe"
         )
 
-    # --------------------------------------------------------
-    # Seguridad por rol
-    # --------------------------------------------------------
-
+    # Cliente solamente puede consultar sus ventas
     if (
         usuario_actual.id_rol == 3
         and venta.id_cliente != usuario_actual.id_usuario
@@ -846,10 +1325,7 @@ def obtener_venta(
         subtotal=float(venta.subtotal),
         total=float(venta.total),
         estado=venta.estado,
-
-        # FECHA DE CREACIÓN
         fecha_creacion=venta.fecha_creacion,
-
         detalles=[
             {
                 "id_detalle": detalle.id_detalle,

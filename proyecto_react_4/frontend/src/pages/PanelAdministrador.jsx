@@ -830,6 +830,98 @@ function PanelAdministrador() {
     };
 
     // ==========================================
+    // EXPORTAR TODAS LAS VENTAS A PDF
+    // ==========================================
+
+    const exportarVentasPDF = async () => {
+        try {
+            const token = obtenerToken();
+
+            const respuesta = await fetch(
+                `${API_URL}/ventas/exportar/pdf`,
+                {
+                    method: "GET",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            if (!respuesta.ok) {
+                const datos = await respuesta.json();
+
+                throw new Error(
+                    datos.detail ||
+                        "No se pudo exportar el reporte en PDF."
+                );
+            }
+
+            const archivo = await respuesta.blob();
+            const url = window.URL.createObjectURL(archivo);
+            const enlace = document.createElement("a");
+
+            enlace.href = url;
+            enlace.download = "reporte_ventas_campolab.pdf";
+
+            document.body.appendChild(enlace);
+            enlace.click();
+            enlace.remove();
+
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error(error);
+            setError(error.message);
+            setMensaje("");
+        }
+    };
+
+    // ==========================================
+    // EXPORTAR REPORTE DIARIO A PDF
+    // ==========================================
+
+    const exportarReporteDiarioPDF = async () => {
+        try {
+            const token = obtenerToken();
+
+            const respuesta = await fetch(
+                `${API_URL}/ventas/reporte-diario/pdf`,
+                {
+                    method: "GET",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            if (!respuesta.ok) {
+                const datos = await respuesta.json();
+
+                throw new Error(
+                    datos.detail ||
+                        "No se pudo exportar el reporte diario en PDF."
+                );
+            }
+
+            const archivo = await respuesta.blob();
+            const url = window.URL.createObjectURL(archivo);
+            const enlace = document.createElement("a");
+
+            enlace.href = url;
+            enlace.download = "reporte_diario_campolab.pdf";
+
+            document.body.appendChild(enlace);
+            enlace.click();
+            enlace.remove();
+
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error(error);
+            setError(error.message);
+            setMensaje("");
+        }
+    };
+
+    // ==========================================
     // CERRAR SESIÓN
     // ==========================================
 
@@ -2529,6 +2621,20 @@ function PanelAdministrador() {
                                             className="bg-green-700 hover:bg-green-800 text-white px-5 py-3 rounded-xl font-semibold"
                                         >
                                             📥 Excel
+                                        </button>
+
+                                        <button
+                                            onClick={exportarVentasPDF}
+                                            className="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-xl font-semibold"
+                                        >
+                                            📄 PDF
+                                        </button>
+
+                                        <button
+                                            onClick={exportarReporteDiarioPDF}
+                                            className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-xl font-semibold"
+                                        >
+                                            📅 PDF Diario
                                         </button>
 
                                     </div>
