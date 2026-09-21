@@ -1,6 +1,5 @@
 import os
 import smtplib
-
 from email.message import EmailMessage
 from dotenv import load_dotenv
 
@@ -14,8 +13,13 @@ def enviar_correo_recuperacion(correo_destino: str, token: str):
     smtp_user = os.getenv("SMTP_USER")
     smtp_password = os.getenv("SMTP_PASSWORD")
 
+    frontend_url = os.getenv(
+        "FRONTEND_URL",
+        "http://localhost:5173"
+    )
+
     enlace = (
-        f"http://localhost:5173/restablecer-password?token={token}"
+        f"{frontend_url}/restablecer-password?token={token}"
     )
 
     mensaje = EmailMessage()
@@ -39,12 +43,12 @@ Este enlace tiene una duración limitada.
 Si tú no solicitaste recuperar tu contraseña, puedes ignorar este correo.
 
 Saludos,
+
 Equipo CampoLab
 """
     )
 
     with smtplib.SMTP(smtp_host, smtp_port) as servidor:
-
         servidor.starttls()
 
         servidor.login(
