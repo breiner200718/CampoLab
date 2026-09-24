@@ -1,14 +1,13 @@
 import os
-import resend
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 
 load_dotenv()
 
 
 def enviar_correo_recuperacion(correo_destino: str, token: str):
-
-    resend.api_key = os.getenv("RESEND_API_KEY")
-
     frontend_url = os.getenv(
         "FRONTEND_URL",
         "http://localhost:5173"
@@ -16,11 +15,18 @@ def enviar_correo_recuperacion(correo_destino: str, token: str):
 
     enlace = f"{frontend_url}/restablecer-password?token={token}"
 
-    params = {
-        "from": "CampoLab <onboarding@resend.dev>",
-        "to": [correo_destino],
-        "subject": "Recuperación de contraseña - CampoLab",
-        "text": f"""
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = int(os.getenv("SMTP_PORT", 587))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+
+    mensaje = MIMEMultipart()
+
+    mensaje["From"] = f"CampoLab <{smtp_user}>"
+    mensaje["To"] = correo_destino
+    mensaje["Subject"] = "Recuperación de contraseña - CampoLab"
+
+    contenido = f"""
 Hola,
 
 Recibimos una solicitud para recuperar la contraseña de tu cuenta de CampoLab.
@@ -37,6 +43,21 @@ Saludos,
 
 Equipo CampoLab
 """
-    }
 
-    resend.Emails.send(params)
+    mensaje.attach(
+        MIMEText(contenido, "plain", "utf-8")
+    )
+
+    with smtplib.SMTP(smtp_host, smtp_port) as servidor:
+        servidor.starttls()
+
+        servidor.login(
+            smtp_user,
+            smtp_password
+        )
+
+        servidor.sendmail(
+            smtp_user,
+            correo_destino,
+            mensaje.as_string()
+        )
